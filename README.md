@@ -31,6 +31,17 @@ Ensure the Go binary directory (usually `~/go/bin`) is on `PATH`, then run:
 go-crap -h
 ```
 
+Upgrade to the newest release with the same installation command:
+
+```sh
+go install github.com/Inspector-Butters/go-crap@latest
+```
+
+Every invocation checks the public Go module proxy and prints a warning to
+standard error when a newer release is available. Network errors never prevent
+analysis. Set `GO_CRAP_NO_UPDATE_CHECK=1` to disable the check in offline or
+hermetic environments.
+
 Alternatively, download a prebuilt Linux or macOS archive from the
 [latest release](https://github.com/Inspector-Butters/go-crap/releases/latest),
 or clone and build from source:

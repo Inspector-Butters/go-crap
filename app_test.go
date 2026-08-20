@@ -4,12 +4,33 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
 )
+
+func TestMain(m *testing.M) {
+	runUpdateCheck = func(context.Context, io.Writer) {}
+	os.Exit(m.Run())
+}
+
+func TestRunChecksForUpdates(t *testing.T) {
+	original := runUpdateCheck
+	defer func() { runUpdateCheck = original }()
+	called := false
+	runUpdateCheck = func(context.Context, io.Writer) { called = true }
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := run(context.Background(), []string{"-version"}, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run(-version) exit = %d, stderr: %s", exitCode, stderr.String())
+	}
+	if !called {
+		t.Fatal("run did not check for updates")
+	}
+}
 
 func TestHelpExitsSuccessfully(t *testing.T) {
 	var stdout, stderr bytes.Buffer

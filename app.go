@@ -14,7 +14,7 @@ import (
 	"text/tabwriter"
 )
 
-var version = "0.2.1"
+var version = "0.3.0"
 
 type stringList []string
 
@@ -41,6 +41,8 @@ type options struct {
 }
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	runUpdateCheck(ctx, stderr)
+
 	var options options
 	flags := flag.NewFlagSet("go-crap", flag.ContinueOnError)
 	flags.SetOutput(stderr)
