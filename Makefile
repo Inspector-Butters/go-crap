@@ -1,5 +1,5 @@
 GO ?= go
-VERSION ?= 0.2.0
+VERSION ?= 0.2.1
 LDFLAGS = -s -w -X main.version=$(VERSION)
 
 .PHONY: build test release clean
