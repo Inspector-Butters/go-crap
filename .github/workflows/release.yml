@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go test -race -count=1 ./...
+      - name: Build release binaries
+        run: make release VERSION="${GITHUB_REF_NAME#v}"
+      - name: Package release binaries
+        run: |
+          for binary in dist/go-crap-*; do
+            name="$(basename "$binary")"
+            tar -C dist -czf "dist/${name}.tar.gz" "$name"
+          done
+          rm dist/go-crap-linux-amd64 dist/go-crap-linux-arm64
+          rm dist/go-crap-darwin-amd64 dist/go-crap-darwin-arm64
+          cd dist
+          sha256sum ./*.tar.gz > checksums.txt
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/checksums.txt
+          --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
