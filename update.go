@@ -40,6 +40,10 @@ func checkForUpdate(ctx context.Context, output io.Writer, client httpDoer, endp
 	if err != nil {
 		return
 	}
+	query := request.URL.Query()
+	query.Set("current", displayVersion(current))
+	query.Set("check", strconv.FormatInt(time.Now().UnixNano(), 10))
+	request.URL.RawQuery = query.Encode()
 	request.Header.Set("User-Agent", "go-crap/"+current)
 	request.Header.Set("Accept", "text/html")
 

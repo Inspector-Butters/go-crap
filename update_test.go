@@ -14,8 +14,14 @@ func TestCheckForUpdateWarnsAboutNewerRelease(t *testing.T) {
 		if request.Method != http.MethodHead {
 			t.Errorf("method = %s", request.Method)
 		}
-		if got := request.Header.Get("User-Agent"); got != "go-crap/0.3.1" {
+		if got := request.Header.Get("User-Agent"); got != "go-crap/0.3.2" {
 			t.Errorf("User-Agent = %q", got)
+		}
+		if got := request.URL.Query().Get("current"); got != "v0.3.2" {
+			t.Errorf("current query = %q", got)
+		}
+		if got := request.URL.Query().Get("check"); got == "" {
+			t.Error("check query is empty")
 		}
 		response.Header().Set("Location", "/releases/tag/v0.4.0")
 		response.WriteHeader(http.StatusFound)
@@ -23,9 +29,9 @@ func TestCheckForUpdateWarnsAboutNewerRelease(t *testing.T) {
 	defer server.Close()
 
 	var output bytes.Buffer
-	checkForUpdate(context.Background(), &output, noRedirectClient(server.Client()), server.URL, "0.3.1")
+	checkForUpdate(context.Background(), &output, noRedirectClient(server.Client()), server.URL, "0.3.2")
 	warning := output.String()
-	if !strings.Contains(warning, "v0.4.0 is available (running v0.3.1)") {
+	if !strings.Contains(warning, "v0.4.0 is available (running v0.3.2)") {
 		t.Fatalf("unexpected warning: %q", warning)
 	}
 	if !strings.Contains(warning, upgradeCommand("v0.4.0")) {
@@ -34,7 +40,7 @@ func TestCheckForUpdateWarnsAboutNewerRelease(t *testing.T) {
 }
 
 func TestCheckForUpdateStaysSilentWithoutNewerRelease(t *testing.T) {
-	for _, latest := range []string{"v0.3.1", "v0.2.9", "not-a-version"} {
+	for _, latest := range []string{"v0.3.2", "v0.2.9", "not-a-version"} {
 		t.Run(latest, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
 				response.Header().Set("Location", "/releases/tag/"+latest)
@@ -43,7 +49,7 @@ func TestCheckForUpdateStaysSilentWithoutNewerRelease(t *testing.T) {
 			defer server.Close()
 
 			var output bytes.Buffer
-			checkForUpdate(context.Background(), &output, noRedirectClient(server.Client()), server.URL, "0.3.1")
+			checkForUpdate(context.Background(), &output, noRedirectClient(server.Client()), server.URL, "0.3.2")
 			if output.Len() != 0 {
 				t.Fatalf("unexpected warning: %q", output.String())
 			}
