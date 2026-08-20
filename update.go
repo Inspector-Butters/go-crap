@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,8 +12,8 @@ import (
 )
 
 const (
-	latestVersionURL = "https://proxy.golang.org/github.com/%21inspector-%21butters/go-crap/@latest"
-	upgradeCommand   = "go install github.com/Inspector-Butters/go-crap@latest"
+	latestVersionURL = "https://github.com/Inspector-Butters/go-crap/releases/latest"
+	modulePath       = "github.com/Inspector-Butters/go-crap"
 )
 
 type httpDoer interface {
@@ -27,37 +26,52 @@ func defaultUpdateCheck(ctx context.Context, output io.Writer) {
 	if os.Getenv("GO_CRAP_NO_UPDATE_CHECK") != "" {
 		return
 	}
-	client := &http.Client{Timeout: 2 * time.Second}
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	checkForUpdate(ctx, output, client, latestVersionURL, version)
 }
 
 func checkForUpdate(ctx context.Context, output io.Writer, client httpDoer, endpoint, current string) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodHead, endpoint, nil)
 	if err != nil {
 		return
 	}
 	request.Header.Set("User-Agent", "go-crap/"+current)
-	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Accept", "text/html")
 
 	response, err := client.Do(request)
 	if err != nil {
 		return
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode < http.StatusMultipleChoices || response.StatusCode >= http.StatusBadRequest {
 		return
 	}
-
-	var release struct {
-		Version string `json:"Version"`
-	}
-	if err := json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&release); err != nil {
+	location, err := response.Location()
+	if err != nil {
 		return
 	}
-	if isNewerVersion(current, release.Version) {
+	const tagMarker = "/releases/tag/"
+	markerIndex := strings.LastIndex(location.Path, tagMarker)
+	if markerIndex < 0 {
+		return
+	}
+	latest := strings.TrimSpace(location.Path[markerIndex+len(tagMarker):])
+	if latest == "" || strings.Contains(latest, "/") {
+		return
+	}
+	if isNewerVersion(current, latest) {
 		fmt.Fprintf(output, "go-crap: warning: %s is available (running %s); update with: %s\n",
-			displayVersion(release.Version), displayVersion(current), upgradeCommand)
+			displayVersion(latest), displayVersion(current), upgradeCommand(latest))
 	}
+}
+
+func upgradeCommand(latest string) string {
+	return "go install " + modulePath + "@" + displayVersion(latest)
 }
 
 func isNewerVersion(current, latest string) bool {

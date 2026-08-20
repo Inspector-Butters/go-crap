@@ -37,8 +37,9 @@ Upgrade to the newest release with the same installation command:
 go install github.com/Inspector-Butters/go-crap@latest
 ```
 
-Every invocation checks the public Go module proxy and prints a warning to
-standard error when a newer release is available. Network errors never prevent
+Every invocation checks GitHub's latest-release redirect and prints a warning
+to standard error when a newer release is available. The warning includes an
+installation command pinned to that release. Network errors never prevent
 analysis. Set `GO_CRAP_NO_UPDATE_CHECK=1` to disable the check in offline or
 hermetic environments.
 

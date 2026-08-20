@@ -14,7 +14,7 @@ import (
 	"text/tabwriter"
 )
 
-var version = "0.3.0"
+var version = "0.3.1"
 
 type stringList []string
 

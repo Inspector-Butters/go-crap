@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,39 +11,52 @@ import (
 
 func TestCheckForUpdateWarnsAboutNewerRelease(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if got := request.Header.Get("User-Agent"); got != "go-crap/0.3.0" {
+		if request.Method != http.MethodHead {
+			t.Errorf("method = %s", request.Method)
+		}
+		if got := request.Header.Get("User-Agent"); got != "go-crap/0.3.1" {
 			t.Errorf("User-Agent = %q", got)
 		}
-		fmt.Fprintln(response, `{"Version":"v0.4.0"}`)
+		response.Header().Set("Location", "/releases/tag/v0.4.0")
+		response.WriteHeader(http.StatusFound)
 	}))
 	defer server.Close()
 
 	var output bytes.Buffer
-	checkForUpdate(context.Background(), &output, server.Client(), server.URL, "0.3.0")
+	checkForUpdate(context.Background(), &output, noRedirectClient(server.Client()), server.URL, "0.3.1")
 	warning := output.String()
-	if !strings.Contains(warning, "v0.4.0 is available (running v0.3.0)") {
+	if !strings.Contains(warning, "v0.4.0 is available (running v0.3.1)") {
 		t.Fatalf("unexpected warning: %q", warning)
 	}
-	if !strings.Contains(warning, upgradeCommand) {
+	if !strings.Contains(warning, upgradeCommand("v0.4.0")) {
 		t.Fatalf("warning does not contain upgrade command: %q", warning)
 	}
 }
 
 func TestCheckForUpdateStaysSilentWithoutNewerRelease(t *testing.T) {
-	for _, latest := range []string{"v0.3.0", "v0.2.9", "not-a-version"} {
+	for _, latest := range []string{"v0.3.1", "v0.2.9", "not-a-version"} {
 		t.Run(latest, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
-				fmt.Fprintf(response, `{"Version":%q}`, latest)
+				response.Header().Set("Location", "/releases/tag/"+latest)
+				response.WriteHeader(http.StatusFound)
 			}))
 			defer server.Close()
 
 			var output bytes.Buffer
-			checkForUpdate(context.Background(), &output, server.Client(), server.URL, "0.3.0")
+			checkForUpdate(context.Background(), &output, noRedirectClient(server.Client()), server.URL, "0.3.1")
 			if output.Len() != 0 {
 				t.Fatalf("unexpected warning: %q", output.String())
 			}
 		})
 	}
+}
+
+func noRedirectClient(client *http.Client) *http.Client {
+	copy := *client
+	copy.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &copy
 }
 
 func TestIsNewerVersion(t *testing.T) {
